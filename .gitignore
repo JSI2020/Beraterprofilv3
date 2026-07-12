@@ -1,0 +1,14 @@
+.env
+.env.local
+uploads/
+output/
+__pycache__/
+*.pyc
+.venv/
+venv/
+_v2ref/
+scripts/template_analysis.json
+scripts/cv_extract_*.txt
+*.pptx.bak
+.DS_Store
+Thumbs.db

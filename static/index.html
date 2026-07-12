@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ORBIT Beraterprofil Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --orbit-bg: #EEF3F7;
+      --orbit-surface: #FFFFFF;
+      --orbit-text: #0F172A;
+      --orbit-muted: #64748B;
+      --orbit-border: #DCE4EC;
+      --orbit-accent: #0891B2;
+      --orbit-accent-2: #06B6D4;
+      --orbit-accent-soft: #E0F7FA;
+      --orbit-navy: #0F172A;
+      --orbit-success: #059669;
+      --orbit-error: #DC2626;
+      --orbit-warning: #D97706;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+      color: var(--orbit-text);
+      background:
+        radial-gradient(1200px 500px at 85% -10%, rgba(8, 145, 178, 0.10), transparent 60%),
+        radial-gradient(900px 400px at -5% 10%, rgba(30, 58, 95, 0.08), transparent 55%),
+        var(--orbit-bg);
+      line-height: 1.55;
+      min-height: 100vh;
+    }
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1.25rem 1.25rem 3rem;
+    }
+    .orbit-hero {
+      background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 55%, #0891B2 100%);
+      color: #fff;
+      border-radius: var(--radius-lg);
+      padding: 2rem 2rem 1.75rem;
+      margin-bottom: 1.5rem;
+      box-shadow: var(--shadow);
+      animation: fadeUp 0.5s ease;
+    }
+    .orbit-hero-eyebrow {
+      display: inline-block;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      opacity: 0.85;
+      margin-bottom: 0.75rem;
+    }
+    .orbit-hero h1 {
+      margin: 0 0 0.75rem;
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      font-weight: 800;
+      line-height: 1.2;
+    }
+    .orbit-hero p {
+      margin: 0 0 1.25rem;
+      opacity: 0.92;
+      max-width: 720px;
+      font-size: 0.98rem;
+    }
+    .orbit-hero-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .orbit-hero-chip {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 999px;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+    .orbit-stepper {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+      animation: fadeUp 0.55s ease;
+    }
+    .orbit-step {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.9rem;
+      border-radius: 999px;
+      background: var(--orbit-surface);
+      border: 1.5px solid var(--orbit-border);
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--orbit-muted);
+    }
+    .orbit-step.is-active {
+      border-color: var(--orbit-accent);
+      color: var(--orbit-accent);
+      background: var(--orbit-accent-soft);
+    }
+    .orbit-step.is-done {
+      border-color: var(--orbit-success);
+      color: var(--orbit-success);
+    }
+    .orbit-step-num {
+      width: 1.4rem;
+      height: 1.4rem;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      background: var(--orbit-border);
+      color: var(--orbit-text);
+    }
+    .orbit-step.is-active .orbit-step-num { background: var(--orbit-accent); color: #fff; }
+    .orbit-step.is-done .orbit-step-num { background: var(--orbit-success); color: #fff; }
+    .orbit-step-arrow { color: var(--orbit-muted); font-weight: 700; }
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.25rem;
+    }
+    @media (min-width: 900px) {
+      .layout { grid-template-columns: 360px 1fr; align-items: start; }
+    }
+    .card {
+      background: var(--orbit-surface);
+      border: 1.5px solid var(--orbit-border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      animation: fadeUp 0.6s ease;
+    }
+    .card h2 {
+      margin: 0 0 1rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.84rem;
+      margin-bottom: 0.4rem;
+      color: var(--orbit-text);
+    }
+    .field { margin-bottom: 1.1rem; }
+    input[type="file"], select {
+      width: 100%;
+      padding: 0.7rem 0.8rem;
+      border: 1.5px solid var(--orbit-border);
+      border-radius: 10px;
+      background: #fff;
+      font-family: inherit;
+      font-size: 0.9rem;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input[type="file"]:focus-within, select:focus {
+      outline: none;
+      border-color: var(--orbit-accent);
+      box-shadow: 0 0 0 3px var(--orbit-accent-soft);
+    }
+    .hint {
+      color: var(--orbit-muted);
+      font-size: 0.8rem;
+      margin-top: 0.3rem;
+    }
+    button {
+      width: 100%;
+      border: none;
+      border-radius: 12px;
+      padding: 0.9rem 1.2rem;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      color: #fff;
+      background: linear-gradient(135deg, var(--orbit-accent), var(--orbit-accent-2));
+      box-shadow: 0 4px 14px rgba(8, 145, 178, 0.35);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(8, 145, 178, 0.4);
+    }
+    button:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
+    #status {
+      margin-top: 1rem;
+      min-height: 1.5rem;
+      font-size: 0.9rem;
+    }
+    .ok { color: var(--orbit-success); font-weight: 600; }
+    .err { color: var(--orbit-error); font-weight: 600; }
+    .warn {
+      background: #FEF3C7;
+      border: 1px solid #FCD34D;
+      color: #92400E;
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      margin-top: 1rem;
+    }
+    a.download {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin-top: 0.5rem;
+      padding: 0.55rem 1rem;
+      background: var(--orbit-accent-soft);
+      color: var(--orbit-accent);
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 0.88rem;
+    }
+    pre {
+      background: #0F172A;
+      color: #E2E8F0;
+      padding: 1rem;
+      border-radius: 12px;
+      overflow: auto;
+      font-size: 0.78rem;
+      max-height: 420px;
+      margin: 0;
+      font-family: 'JetBrains Mono', Consolas, monospace;
+    }
+    .preview-empty {
+      color: var(--orbit-muted);
+      font-size: 0.9rem;
+      text-align: center;
+      padding: 2.5rem 1rem;
+    }
+    .arch {
+      margin-top: 1.25rem;
+      font-size: 0.88rem;
+      color: var(--orbit-muted);
+    }
+    .arch h3 { color: var(--orbit-text); font-size: 1rem; margin: 0 0 0.5rem; }
+    .arch ol { padding-left: 1.2rem; margin: 0; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="orbit-hero">
+      <span class="orbit-hero-eyebrow">ORBIT IT-Solutions · Beraterprofil-Generator</span>
+      <h1>Aus jedem Lebenslauf in Sekunden ein Beraterprofil</h1>
+      <p>Laden Sie einen Lebenslauf hoch — die KI erstellt eine personalisierte, markengerechte ORBIT-Einseiter-Präsentation auf Deutsch. Funktioniert für jedes Fachgebiet: Telekom, IT, Software, Cloud, Sales, Dokumentation.</p>
+      <div class="orbit-hero-chips">
+        <span class="orbit-hero-chip">Jede Branche</span>
+        <span class="orbit-hero-chip">Deutsche Ausgabe</span>
+        <span class="orbit-hero-chip">Festes ORBIT-Template</span>
+        <span class="orbit-hero-chip">Striktes Layout</span>
+      </div>
+    </div>
+
+    <div class="orbit-stepper" id="stepper">
+      <div class="orbit-step is-active" data-step="upload"><span class="orbit-step-num">1</span>Lebenslauf laden</div>
+      <span class="orbit-step-arrow">→</span>
+      <div class="orbit-step" data-step="review"><span class="orbit-step-num">2</span>Prüfen</div>
+      <span class="orbit-step-arrow">→</span>
+      <div class="orbit-step" data-step="export"><span class="orbit-step-num">3</span>Exportieren</div>
+    </div>
+
+    <div class="layout">
+      <div class="card">
+        <h2>Upload</h2>
+        <form id="form">
+          <div class="field">
+            <label for="cv">Lebenslauf (PDF oder DOCX) *</label>
+            <input type="file" id="cv" name="cv" accept=".pdf,.docx" required />
+          </div>
+          <div class="field">
+            <label for="photo">Profilfoto (optional)</label>
+            <input type="file" id="photo" name="photo" accept=".jpg,.jpeg,.png,.webp" />
+            <p class="hint">Separater Upload — Foto wird nicht aus dem CV extrahiert.</p>
+          </div>
+          <div class="field">
+            <label for="provider">LLM Provider</label>
+            <select id="provider" name="provider">
+              <option value="deepseek">DeepSeek (empfohlen)</option>
+              <option value="mistral">Mistral</option>
+            </select>
+          </div>
+          <button type="submit" id="submitBtn">Beraterprofil erstellen</button>
+        </form>
+        <div id="status"></div>
+        <div class="arch">
+          <h3>Pipeline</h3>
+          <ol>
+            <li><strong>CV Parser</strong> — PDF/DOCX → Rohtext</li>
+            <li><strong>LLM-Agent</strong> — Rohtext → JSON (Deutsch)</li>
+            <li><strong>PPTX Builder</strong> — Template befüllen (Layout bleibt unverändert)</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Ergebnis-Vorschau (JSON)</h2>
+        <pre id="preview" hidden></pre>
+        <p class="preview-empty" id="previewEmpty">Nach der Generierung erscheint hier das extrahierte Profil.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("form");
+    const status = document.getElementById("status");
+    const preview = document.getElementById("preview");
+    const previewEmpty = document.getElementById("previewEmpty");
+    const submitBtn = document.getElementById("submitBtn");
+    const steps = document.querySelectorAll(".orbit-step");
+
+    function setStep(active) {
+      const order = ["upload", "review", "export"];
+      const idx = order.indexOf(active);
+      steps.forEach((el) => {
+        const key = el.dataset.step;
+        const i = order.indexOf(key);
+        el.classList.remove("is-active", "is-done");
+        if (key === active) el.classList.add("is-active");
+        else if (i < idx) el.classList.add("is-done");
+        const num = el.querySelector(".orbit-step-num");
+        if (num) num.textContent = i < idx ? "✓" : String(i + 1);
+      });
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      status.className = "";
+      status.innerHTML = '<div class="warn">Verarbeitung läuft … LLM-Extraktion kann 20–60 Sek. dauern.</div>';
+      preview.hidden = true;
+      previewEmpty.hidden = false;
+      submitBtn.disabled = true;
+      setStep("review");
+
+      const fd = new FormData(form);
+      try {
+        const res = await fetch("/api/generate", { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Fehler bei der Generierung");
+
+        status.className = "ok";
+        status.innerHTML = `Fertig! <a class="download" href="${data.download_url}">⬇ PowerPoint herunterladen</a>`;
+        preview.hidden = false;
+        previewEmpty.hidden = true;
+        preview.textContent = JSON.stringify(data.profile, null, 2);
+        setStep("export");
+      } catch (err) {
+        status.className = "err";
+        status.textContent = err.message;
+        setStep("upload");
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
