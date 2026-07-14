@@ -23,7 +23,115 @@ DESIGN_CSS = """
 
 html, body, [class*="css"] {
     font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
-    color: var(--orbit-text);
+    color: #0F172A !important;
+}
+
+/* === GLOBAL READABILITY (fixes white/invisible labels) === */
+.stApp,
+[data-testid="stAppViewContainer"],
+[data-testid="stAppViewContainer"] main,
+[data-testid="stAppViewContainer"] section {
+    color: #0F172A !important;
+}
+
+[data-testid="stAppViewContainer"] h1,
+[data-testid="stAppViewContainer"] h2,
+[data-testid="stAppViewContainer"] h3,
+[data-testid="stAppViewContainer"] h4,
+[data-testid="stAppViewContainer"] h5,
+[data-testid="stAppViewContainer"] h6,
+[data-testid="stAppViewContainer"] p,
+[data-testid="stAppViewContainer"] label,
+[data-testid="stAppViewContainer"] span,
+[data-testid="stAppViewContainer"] li,
+[data-testid="stAppViewContainer"] strong,
+[data-testid="stAppViewContainer"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stAppViewContainer"] [data-testid="stMarkdownContainer"] strong,
+[data-testid="stAppViewContainer"] [data-testid="stMarkdownContainer"] h1,
+[data-testid="stAppViewContainer"] [data-testid="stMarkdownContainer"] h2,
+[data-testid="stAppViewContainer"] [data-testid="stMarkdownContainer"] h3,
+[data-testid="stAppViewContainer"] [data-testid="stMarkdownContainer"] h4,
+[data-testid="stAppViewContainer"] [data-testid="stWidgetLabel"] p,
+[data-testid="stAppViewContainer"] [data-testid="stWidgetLabel"] label,
+[data-testid="stAppViewContainer"] .stRadio label span,
+[data-testid="stAppViewContainer"] .stCheckbox label span {
+    color: #0F172A !important;
+    -webkit-text-fill-color: #0F172A !important;
+    opacity: 1 !important;
+}
+
+[data-testid="stAppViewContainer"] [data-testid="stCaptionContainer"] p {
+    color: #475569 !important;
+    -webkit-text-fill-color: #475569 !important;
+}
+
+/* Bordered settings card */
+[data-testid="stAppViewContainer"] [data-testid="stVerticalBlockBorderWrapper"] {
+    background: #FFFFFF !important;
+    border-color: #DCE4EC !important;
+}
+[data-testid="stAppViewContainer"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stAppViewContainer"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdownContainer"] strong,
+[data-testid="stAppViewContainer"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stWidgetLabel"] p,
+[data-testid="stAppViewContainer"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stWidgetLabel"] label,
+[data-testid="stAppViewContainer"] [data-testid="stVerticalBlockBorderWrapper"] label {
+    color: #0F172A !important;
+    -webkit-text-fill-color: #0F172A !important;
+}
+[data-testid="stAppViewContainer"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCaptionContainer"] p {
+    color: #475569 !important;
+    -webkit-text-fill-color: #475569 !important;
+}
+
+/* Select / dropdown: light background, dark text */
+[data-testid="stAppViewContainer"] [data-baseweb="select"] > div {
+    background-color: #FFFFFF !important;
+    color: #0F172A !important;
+    border: 1.5px solid #DCE4EC !important;
+}
+[data-testid="stAppViewContainer"] [data-baseweb="select"] span,
+[data-testid="stAppViewContainer"] [data-baseweb="select"] div,
+[data-testid="stAppViewContainer"] [data-baseweb="select"] input {
+    color: #0F172A !important;
+    -webkit-text-fill-color: #0F172A !important;
+    background-color: #FFFFFF !important;
+}
+
+/* File uploader */
+[data-testid="stAppViewContainer"] [data-testid="stFileUploader"] section {
+    background: #FFFFFF !important;
+    border: 1.5px dashed #DCE4EC !important;
+}
+[data-testid="stAppViewContainer"] [data-testid="stFileUploader"] span,
+[data-testid="stAppViewContainer"] [data-testid="stFileUploader"] small,
+[data-testid="stAppViewContainer"] [data-testid="stFileUploader"] p,
+[data-testid="stAppViewContainer"] [data-testid="stFileUploader"] button,
+[data-testid="stAppViewContainer"] [data-testid="stFileUploader"] button p,
+[data-testid="stAppViewContainer"] [data-testid="stFileUploader"] label {
+    color: #0F172A !important;
+    -webkit-text-fill-color: #0F172A !important;
+}
+
+/* Text areas */
+[data-testid="stAppViewContainer"] textarea {
+    color: #0F172A !important;
+    -webkit-text-fill-color: #0F172A !important;
+    background: #FFFFFF !important;
+    border: 1.5px solid #DCE4EC !important;
+}
+
+/* First column (settings) - extra specificity */
+.block-container div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child [data-testid="stMarkdownContainer"] p,
+.block-container div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child [data-testid="stMarkdownContainer"] strong,
+.block-container div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child [data-testid="stWidgetLabel"] p,
+.block-container div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child [data-testid="stWidgetLabel"] label,
+.block-container div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child label {
+    color: #0F172A !important;
+    -webkit-text-fill-color: #0F172A !important;
+}
+.block-container div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child [data-testid="stCaptionContainer"] p {
+    color: #475569 !important;
+    -webkit-text-fill-color: #475569 !important;
 }
 
 .stApp {

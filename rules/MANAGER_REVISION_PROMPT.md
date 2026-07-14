@@ -9,7 +9,7 @@ You receive JSON with:
 - `cv_text`: original CV text (optional, only when profile was created from CV)
 
 ## Output
-Return ONLY the updated Beraterprofil JSON with the same schema:
+Return ONLY a flat JSON object with the updated profile fields (do NOT wrap in current_profile or any envelope):
 - title_domain, position, schwerpunkte, summary
 - kompetenzen (list of strings)
 - relevante_erfahrungen (list of {label, beschreibung})

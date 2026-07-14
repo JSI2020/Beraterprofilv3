@@ -13,7 +13,7 @@ from pathlib import Path
 from app.config import OUTPUT_DIR, TEMPLATE_PATH, settings
 from app.pipeline import generate_beraterprofil
 from app.schemas.profile import BeraterprofilData
-from app.services.llm_agent import revise_profile_with_feedback
+from app.services.llm_agent import revise_profile_with_feedback_sync
 from app.services.pptx_parser import parse_beraterprofil_pptx
 
 
@@ -103,13 +103,11 @@ def apply_feedback_sync(
     cv_text: str | None = None,
     provider: str = "deepseek",
 ) -> BeraterprofilData:
-    return asyncio.run(
-        revise_profile_with_feedback(
-            profile,
-            manager_comment,
-            cv_text=cv_text,
-            provider=provider,
-        )
+    return revise_profile_with_feedback_sync(
+        profile,
+        manager_comment,
+        cv_text=cv_text,
+        provider=provider,
     )
 
 

@@ -22,6 +22,7 @@ from ui.pipeline import (
     save_upload_temporarily,
     validate_for_export,
 )
+from app.schemas.profile import BeraterprofilData
 from ui.preview import render_hero, render_llm_badge, render_preview, render_stepper
 from ui.settings_panel import render_settings_panel
 from ui.styles import inject_styles
@@ -49,6 +50,7 @@ def init_session_state() -> None:
         "cv_raw_text": "",
         "manager_history": [],
         "photo_temp_path": None,
+        "profile_revision": 0,
         "_export_done": False,
     }
     for key, value in defaults.items():
@@ -62,7 +64,31 @@ def clear_profile_state() -> None:
     st.session_state.profile_source = ""
     st.session_state.cv_raw_text = ""
     st.session_state.manager_history = []
+    st.session_state.profile_revision = 0
     st.session_state._export_done = False
+
+
+def _load_profile() -> BeraterprofilData:
+    return profile_from_json(st.session_state.profile_json)
+
+
+def _photo_path() -> Path | None:
+    if not st.session_state.photo_temp_path:
+        return None
+    path = Path(st.session_state.photo_temp_path)
+    return path if path.exists() else None
+
+
+def _apply_profile_update(profile: BeraterprofilData, *, regenerate_pptx: bool = True) -> None:
+    st.session_state.profile_json = profile_to_json(profile)
+    st.session_state.profile_revision = int(st.session_state.get("profile_revision", 0)) + 1
+    if regenerate_pptx:
+        output = export_pptx(profile, photo_path=_photo_path())
+        st.session_state.pptx_path = str(output)
+        st.session_state._export_done = True
+    else:
+        st.session_state.pptx_path = ""
+        st.session_state._export_done = False
 
 
 def render_main_workflow(opts: dict, status: dict) -> None:
@@ -79,7 +105,8 @@ def render_main_workflow(opts: dict, status: dict) -> None:
     render_llm_badge(status["active"], status.get("provider"))
 
     st.markdown(
-        '<div class="orbit-card"><div class="orbit-card-title">Schritt 1 - Profil laden</div>',
+        '<p style="color:#64748B;font-weight:800;font-size:0.72rem;letter-spacing:0.1em;'
+        'text-transform:uppercase;margin:0 0 0.85rem 0;">Schritt 1 - Profil laden</p>',
         unsafe_allow_html=True,
     )
 
@@ -109,7 +136,7 @@ def render_main_workflow(opts: dict, status: dict) -> None:
         )
         st.caption("Laden Sie ein bestehendes ORBIT-Beraterprofil zum Bearbeiten und Export.")
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('<div style="margin-top:0.5rem"></div>', unsafe_allow_html=True)
 
     col_action, col_new = st.columns([3, 1])
     with col_action:
@@ -154,6 +181,7 @@ def render_main_workflow(opts: dict, status: dict) -> None:
                 )
                 st.session_state.profile_json = profile_to_json(profile)
                 st.session_state.pptx_path = str(out_path)
+                st.session_state.profile_revision = 0
             st.success("Profil erstellt - bitte pruefen und exportieren.")
         except Exception as exc:
             st.error(f"Profil-Generierung fehlgeschlagen: {exc}")
@@ -170,6 +198,7 @@ def render_main_workflow(opts: dict, status: dict) -> None:
                 st.session_state.profile_source = "pptx"
                 st.session_state.cv_raw_text = ""
                 st.session_state.pptx_path = str(pptx_path)
+                st.session_state.profile_revision = 0
             st.success("Profil aus PPTX geladen.")
         except Exception as exc:
             st.error(f"PPTX konnte nicht gelesen werden: {exc}")
@@ -184,7 +213,11 @@ def render_main_workflow(opts: dict, status: dict) -> None:
 
 def _render_manager_feedback(opts: dict, status: dict) -> None:
     st.markdown("---")
-    st.markdown("#### Schritt 2 - Feedback (optional)")
+    st.markdown(
+        '<p style="color:#0F172A;font-weight:700;font-size:1rem;margin:0;">'
+        "Schritt 2 - Feedback (optional)</p>",
+        unsafe_allow_html=True,
+    )
     st.caption("Manager kann Kommentare geben. Bei CV-Profilen wird das CV als Quelle genutzt.")
 
     manager_comment = st.text_area(
@@ -203,9 +236,10 @@ def _render_manager_feedback(opts: dict, status: dict) -> None:
         type="primary",
         disabled=not manager_comment.strip() or not can_revise,
         use_container_width=True,
+        key="apply_feedback_btn",
     ):
         try:
-            current = profile_from_json(st.session_state.profile_json)
+            current = _load_profile()
             cv_text = st.session_state.cv_raw_text if st.session_state.profile_source == "cv" else None
             with st.spinner("LLM aktualisiert das Profil nach Feedback ..."):
                 revised = apply_feedback_sync(
@@ -214,15 +248,14 @@ def _render_manager_feedback(opts: dict, status: dict) -> None:
                     cv_text=cv_text,
                     provider=opts["provider"],
                 )
-                st.session_state.profile_json = profile_to_json(revised)
+                _apply_profile_update(revised, regenerate_pptx=True)
                 st.session_state.manager_history.append(
                     {
                         "time": datetime.now().strftime("%H:%M:%S"),
                         "comment": manager_comment.strip(),
                     }
                 )
-                st.session_state._export_done = False
-            st.success("Profil aktualisiert.")
+            st.success("Profil und PowerPoint wurden aktualisiert.")
             st.rerun()
         except Exception as exc:
             st.error(f"Feedback-Update fehlgeschlagen: {exc}")
@@ -244,29 +277,43 @@ def _render_manager_feedback(opts: dict, status: dict) -> None:
 def _render_results(opts: dict, status: dict) -> None:
     st.markdown("---")
     try:
-        profile = profile_from_json(st.session_state.profile_json)
+        profile = _load_profile()
+    except json.JSONDecodeError as exc:
+        st.error(f"JSON ungueltig: {exc}")
+        return
+
+    _render_manager_feedback(opts, status)
+
+    try:
+        profile = _load_profile()
     except json.JSONDecodeError as exc:
         st.error(f"JSON ungueltig: {exc}")
         return
 
     render_preview(profile)
-    _render_manager_feedback(opts, status)
 
+    rev = int(st.session_state.get("profile_revision", 0))
     with st.expander("JSON bearbeiten", expanded=False):
         edited = st.text_area(
             "Profil-JSON",
-            st.session_state.profile_json,
+            value=st.session_state.profile_json,
             height=420,
             label_visibility="collapsed",
+            key=f"profile_json_editor_{rev}",
         )
-        st.session_state.profile_json = edited
-        try:
-            profile = profile_from_json(edited)
-        except json.JSONDecodeError as exc:
-            st.error(f"JSON ungueltig: {exc}")
-            return
+        if edited != st.session_state.profile_json:
+            st.session_state.profile_json = edited
+            try:
+                profile = profile_from_json(edited)
+            except json.JSONDecodeError as exc:
+                st.error(f"JSON ungueltig: {exc}")
+                return
 
-    st.markdown("#### Schritt 3 - PowerPoint exportieren")
+    st.markdown(
+        '<p style="color:#0F172A;font-weight:700;font-size:1rem;margin:1rem 0 0.5rem 0;">'
+        "Schritt 3 - PowerPoint exportieren</p>",
+        unsafe_allow_html=True,
+    )
     can_export, issues = validate_for_export(profile)
     if can_export:
         st.success("Validierung bestanden - bereit fuer Export")
@@ -275,19 +322,13 @@ def _render_results(opts: dict, status: dict) -> None:
         for issue in issues:
             st.write(f"- {issue}")
 
-    if st.button("PowerPoint erstellen", type="primary", disabled=not can_export):
-        photo = (
-            Path(st.session_state.photo_temp_path)
-            if st.session_state.photo_temp_path
-            else None
-        )
-        output = export_pptx(
-            profile,
-            photo_path=photo if photo and photo.exists() else None,
-        )
+    if st.button("PowerPoint erstellen", type="primary", disabled=not can_export, key="export_pptx_btn"):
+        profile = _load_profile()
+        output = export_pptx(profile, photo_path=_photo_path())
         st.session_state.pptx_path = str(output)
         st.session_state._export_done = True
         st.success(f"Erstellt: {output.name}")
+        st.rerun()
 
     pptx_path = Path(st.session_state.pptx_path) if st.session_state.pptx_path else None
     if pptx_path and pptx_path.exists():
