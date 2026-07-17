@@ -6,11 +6,15 @@ import json
 import re
 from pathlib import Path
 
-import httpx
-
-from app.config import PROMPT_PATH, settings
+from app.config import PROMPT_PATH
 from app.schemas.profile import BeraterprofilData
-from app.services.content_fit import LIMITS, fit_profile
+from app.services.content_fit import (
+    LIMITS,
+    profile_validation_issues,
+    sanitize_profile_dict,
+    fit_profile,
+)
+from app.services.llm_providers import call_llm_with_fallback, call_llm_with_fallback_sync
 
 
 def _load_system_prompt() -> str:
@@ -19,7 +23,6 @@ def _load_system_prompt() -> str:
 
 def _extract_json(text: str) -> dict:
     text = text.strip()
-    # Strip markdown fences if present
     fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
     if fence:
         text = fence.group(1)
@@ -28,112 +31,6 @@ def _extract_json(text: str) -> dict:
     if start == -1 or end == -1:
         raise ValueError("LLM response did not contain JSON object")
     return json.loads(text[start : end + 1])
-
-
-async def _call_deepseek(system: str, user: str) -> str:
-    if not settings.deepseek_api_key:
-        raise RuntimeError("DEEPSEEK_API_KEY not configured in .env")
-    url = f"{settings.deepseek_base_url.rstrip('/')}/chat/completions"
-    payload = {
-        "model": settings.deepseek_model,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        "temperature": 0.2,
-        "response_format": {"type": "json_object"},
-    }
-    headers = {
-        "Authorization": f"Bearer {settings.deepseek_api_key}",
-        "Content-Type": "application/json",
-    }
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        resp = await client.post(url, json=payload, headers=headers)
-        resp.raise_for_status()
-        data = resp.json()
-    return data["choices"][0]["message"]["content"]
-
-
-async def _call_mistral(system: str, user: str) -> str:
-    if not settings.mistral_api_key:
-        raise RuntimeError("MISTRAL_API_KEY not configured in .env")
-    url = f"{settings.mistral_base_url.rstrip('/')}/chat/completions"
-    payload = {
-        "model": settings.mistral_model,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        "temperature": 0.2,
-        "response_format": {"type": "json_object"},
-    }
-    headers = {
-        "Authorization": f"Bearer {settings.mistral_api_key}",
-        "Content-Type": "application/json",
-    }
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        resp = await client.post(url, json=payload, headers=headers)
-        resp.raise_for_status()
-        data = resp.json()
-    return data["choices"][0]["message"]["content"]
-
-
-async def extract_profile(cv_text: str, provider: str | None = None) -> BeraterprofilData:
-    provider = (provider or settings.llm_provider).lower()
-    system = _load_system_prompt()
-    user = f"Lebenslauf (Rohtext):\n\n{cv_text[:50000]}"
-
-    if provider == "deepseek":
-        raw = await _call_deepseek(system, user)
-    elif provider == "mistral":
-        raw = await _call_mistral(system, user)
-    else:
-        raise ValueError(f"Unsupported LLM provider: {provider}. Use deepseek or mistral.")
-
-    parsed = _extract_json(raw)
-    parsed = _normalize_payload(parsed)
-    profile = BeraterprofilData.model_validate(parsed)
-    return fit_profile(profile)
-
-
-_REVISION_PROMPT_PATH = PROMPT_PATH.parent / "MANAGER_REVISION_PROMPT.md"
-
-
-def _load_revision_prompt() -> str:
-    return _REVISION_PROMPT_PATH.read_text(encoding="utf-8")
-
-
-async def revise_profile_with_feedback(
-    profile: BeraterprofilData,
-    manager_comment: str,
-    *,
-    cv_text: str | None = None,
-    provider: str | None = None,
-) -> BeraterprofilData:
-    comment = manager_comment.strip()
-    if not comment:
-        raise ValueError("Feedback-Kommentar ist leer")
-
-    provider = (provider or settings.llm_provider).lower()
-    system = _load_revision_prompt()
-    payload = {
-        "current_profile": json.loads(profile.model_dump_json()),
-        "manager_comment": comment,
-        "cv_text": (cv_text or "")[:50000],
-    }
-    user = json.dumps(payload, ensure_ascii=False, indent=2)
-
-    if provider == "deepseek":
-        raw = await _call_deepseek(system, user)
-    elif provider == "mistral":
-        raw = await _call_mistral(system, user)
-    else:
-        raise ValueError(f"Unsupported LLM provider: {provider}")
-
-    parsed = _extract_json(raw)
-    parsed = _normalize_payload(parsed)
-    revised = BeraterprofilData.model_validate(parsed)
-    return fit_profile(revised)
 
 
 def _unwrap_profile_dict(data: dict) -> dict:
@@ -162,53 +59,92 @@ def _normalize_payload(data: dict) -> dict:
     data["abschluss_zertifikate"] = (data.get("abschluss_zertifikate") or [])[
         : LIMITS["abschluss_count"]
     ]
-    return data
+    return sanitize_profile_dict(data)
 
 
-def _call_deepseek_sync(system: str, user: str) -> str:
-    if not settings.deepseek_api_key:
-        raise RuntimeError("DEEPSEEK_API_KEY not configured in .env")
-    url = f"{settings.deepseek_base_url.rstrip('/')}/chat/completions"
+def _build_repair_prompt(missing: list[str]) -> str:
+    return (
+        "Die vorherige JSON-Antwort war unvollständig oder ungültig.\n"
+        f"Fehlende Pflichtfelder: {', '.join(missing)}\n\n"
+        "Extrahiere das vollständige Profil ERNEUT ausschließlich aus dem Lebenslauf-Rohtext.\n"
+        "Verwende KEINE Platzhalter, KEINE generischen Sätze und KEINE erfundenen Inhalte.\n"
+        "Jedes Feld muss direkt aus dem CV stammen."
+    )
+
+
+async def _parse_and_validate(raw: str) -> BeraterprofilData:
+    parsed = _normalize_payload(_extract_json(raw))
+    issues = profile_validation_issues(parsed)
+    if issues:
+        raise ValueError(", ".join(issues))
+    profile = BeraterprofilData.model_validate(parsed)
+    return fit_profile(profile)
+
+
+async def extract_profile(cv_text: str, provider: str | None = None) -> BeraterprofilData:
+    system = _load_system_prompt()
+    user = f"Lebenslauf (Rohtext):\n\n{cv_text[:50000]}"
+    raw, used = await call_llm_with_fallback(system, user, provider=provider)
+    try:
+        return await _parse_and_validate(raw)
+    except ValueError as first_error:
+        missing = [part.strip() for part in str(first_error).split(",") if part.strip()]
+        repair_user = (
+            f"{_build_repair_prompt(missing)}\n\n"
+            f"Lebenslauf (Rohtext):\n\n{cv_text[:50000]}"
+        )
+        raw_retry, _ = await call_llm_with_fallback(system, repair_user, provider=used)
+        try:
+            return await _parse_and_validate(raw_retry)
+        except ValueError as second_error:
+            raise ValueError(
+                f"Profil konnte nicht vollständig aus dem CV extrahiert werden: {second_error}"
+            ) from second_error
+
+
+_REVISION_PROMPT_PATH = PROMPT_PATH.parent / "MANAGER_REVISION_PROMPT.md"
+
+
+def _load_revision_prompt() -> str:
+    return _REVISION_PROMPT_PATH.read_text(encoding="utf-8")
+
+
+async def revise_profile_with_feedback(
+    profile: BeraterprofilData,
+    manager_comment: str,
+    *,
+    cv_text: str | None = None,
+    provider: str | None = None,
+) -> BeraterprofilData:
+    comment = manager_comment.strip()
+    if not comment:
+        raise ValueError("Feedback-Kommentar ist leer")
+
+    system = _load_revision_prompt()
     payload = {
-        "model": settings.deepseek_model,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        "temperature": 0.2,
-        "response_format": {"type": "json_object"},
+        "current_profile": json.loads(profile.model_dump_json()),
+        "manager_comment": comment,
+        "cv_text": (cv_text or "")[:50000],
     }
-    headers = {
-        "Authorization": f"Bearer {settings.deepseek_api_key}",
-        "Content-Type": "application/json",
-    }
-    with httpx.Client(timeout=120.0) as client:
-        resp = client.post(url, json=payload, headers=headers)
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+    user = json.dumps(payload, ensure_ascii=False, indent=2)
+    raw, _used = await call_llm_with_fallback(system, user, provider=provider)
+    parsed = _normalize_payload(_extract_json(raw))
+    issues = profile_validation_issues(parsed)
+    if issues:
+        raise ValueError(
+            "Feedback-Profil unvollständig — fehlende Felder: " + ", ".join(issues)
+        )
+    revised = BeraterprofilData.model_validate(parsed)
+    return fit_profile(revised)
 
 
-def _call_mistral_sync(system: str, user: str) -> str:
-    if not settings.mistral_api_key:
-        raise RuntimeError("MISTRAL_API_KEY not configured in .env")
-    url = f"{settings.mistral_base_url.rstrip('/')}/chat/completions"
-    payload = {
-        "model": settings.mistral_model,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        "temperature": 0.2,
-        "response_format": {"type": "json_object"},
-    }
-    headers = {
-        "Authorization": f"Bearer {settings.mistral_api_key}",
-        "Content-Type": "application/json",
-    }
-    with httpx.Client(timeout=120.0) as client:
-        resp = client.post(url, json=payload, headers=headers)
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+def _parse_and_validate_sync(raw: str) -> BeraterprofilData:
+    parsed = _normalize_payload(_extract_json(raw))
+    issues = profile_validation_issues(parsed)
+    if issues:
+        raise ValueError(", ".join(issues))
+    profile = BeraterprofilData.model_validate(parsed)
+    return fit_profile(profile)
 
 
 def revise_profile_with_feedback_sync(
@@ -223,7 +159,6 @@ def revise_profile_with_feedback_sync(
     if not comment:
         raise ValueError("Feedback-Kommentar ist leer")
 
-    provider = (provider or settings.llm_provider).lower()
     system = _load_revision_prompt()
     payload = {
         "current_profile": json.loads(profile.model_dump_json()),
@@ -231,15 +166,5 @@ def revise_profile_with_feedback_sync(
         "cv_text": (cv_text or "")[:50000],
     }
     user = json.dumps(payload, ensure_ascii=False, indent=2)
-
-    if provider == "deepseek":
-        raw = _call_deepseek_sync(system, user)
-    elif provider == "mistral":
-        raw = _call_mistral_sync(system, user)
-    else:
-        raise ValueError(f"Unsupported LLM provider: {provider}")
-
-    parsed = _extract_json(raw)
-    parsed = _normalize_payload(parsed)
-    revised = BeraterprofilData.model_validate(parsed)
-    return fit_profile(revised)
+    raw, _used = call_llm_with_fallback_sync(system, user, provider=provider)
+    return _parse_and_validate_sync(raw)

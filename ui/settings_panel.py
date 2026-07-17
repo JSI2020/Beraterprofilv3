@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import streamlit as st
 
+from app.services.llm_providers import PROVIDER_LABELS, PROVIDER_ORDER, available_providers
 from ui.pipeline import llm_status
 
 
 def render_settings_panel(config: dict) -> dict:
-    provider_names = {"deepseek": "DeepSeek", "mistral": "Mistral"}
+    status = llm_status()
+    available = set(available_providers())
 
     with st.container(border=True):
         st.markdown(
@@ -22,14 +24,20 @@ def render_settings_panel(config: dict) -> dict:
             unsafe_allow_html=True,
         )
 
-        status = llm_status()
         if status["active"]:
-            st.success(f"LLM aktiv - {provider_names.get(status['provider'], status['provider'])}")
+            label = PROVIDER_LABELS.get(status["provider"], status["provider"])
+            model = status.get("model") or ""
+            st.success(f"LLM aktiv - {label} ({model})")
+            if status.get("fallback_chain"):
+                fallbacks = ", ".join(
+                    PROVIDER_LABELS.get(p, p) for p in status["fallback_chain"]
+                )
+                st.caption(f"Fallback: {fallbacks}")
         else:
             st.warning("Kein LLM API-Key in .env gefunden.")
 
         st.markdown(
-            '<p style="color:#0891B2;font-weight:700;font-size:0.75rem;'
+            '<p style="color:#06B6D4;font-weight:700;font-size:0.75rem;'
             'letter-spacing:0.06em;text-transform:uppercase;margin:0.75rem 0 0.5rem 0;">Profil</p>',
             unsafe_allow_html=True,
         )
@@ -41,18 +49,25 @@ def render_settings_panel(config: dict) -> dict:
         position_override = st.selectbox("Position (optional)", ["Aus CV ableiten"] + position_levels)
 
         st.markdown(
-            '<p style="color:#0891B2;font-weight:700;font-size:0.75rem;'
+            '<p style="color:#06B6D4;font-weight:700;font-size:0.75rem;'
             'letter-spacing:0.06em;text-transform:uppercase;margin:0.75rem 0 0.5rem 0;">Generierung</p>',
             unsafe_allow_html=True,
         )
+        provider_options = list(PROVIDER_ORDER)
         provider = st.selectbox(
             "LLM Provider",
-            ["deepseek", "mistral"],
-            format_func=lambda p: provider_names.get(p, p),
+            provider_options,
+            key="llm_provider_select",
+            format_func=lambda p: (
+                f"{PROVIDER_LABELS.get(p, p)} (Priorität 1)"
+                if p == "openai"
+                else PROVIDER_LABELS.get(p, p)
+            )
+            + ("" if p in available else " - kein API-Key"),
         )
 
         st.markdown(
-            '<p style="color:#0891B2;font-weight:700;font-size:0.75rem;'
+            '<p style="color:#06B6D4;font-weight:700;font-size:0.75rem;'
             'letter-spacing:0.06em;text-transform:uppercase;margin:0.75rem 0 0.5rem 0;">Optional</p>',
             unsafe_allow_html=True,
         )

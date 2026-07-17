@@ -10,24 +10,18 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from app.config import OUTPUT_DIR, TEMPLATE_PATH, settings
+from app.config import OUTPUT_DIR, TEMPLATE_PATH
 from app.pipeline import generate_beraterprofil
 from app.schemas.profile import BeraterprofilData
 from app.services.llm_agent import revise_profile_with_feedback_sync
 from app.services.pptx_parser import parse_beraterprofil_pptx
 
 
+from app.services.llm_providers import llm_status as _llm_status, resolve_provider
+
+
 def llm_status() -> dict:
-    provider = settings.llm_provider
-    if provider == "deepseek" and settings.deepseek_api_key:
-        return {"active": True, "provider": "deepseek", "model": settings.deepseek_model}
-    if provider == "mistral" and settings.mistral_api_key:
-        return {"active": True, "provider": "mistral", "model": settings.mistral_model}
-    if settings.deepseek_api_key:
-        return {"active": True, "provider": "deepseek", "model": settings.deepseek_model}
-    if settings.mistral_api_key:
-        return {"active": True, "provider": "mistral", "model": settings.mistral_model}
-    return {"active": False, "provider": None, "model": None}
+    return _llm_status()
 
 
 def save_upload_temporarily(uploaded_file) -> Path:
@@ -56,12 +50,14 @@ def generate_sync(
     cv_path: Path,
     *,
     photo_path: Path | None = None,
-    provider: str = "deepseek",
+    provider: str | None = None,
     position_override: str | None = None,
 ) -> tuple[Path, BeraterprofilData]:
-    out_path, profile = asyncio.run(_generate(cv_path, photo_path, provider))
+    resolved = resolve_provider(provider)
+    out_path, profile = asyncio.run(_generate(cv_path, photo_path, resolved))
     if position_override and position_override != "Aus CV ableiten":
         profile.position = position_override
+        out_path = export_pptx(profile, photo_path=photo_path)
     return out_path, profile
 
 
@@ -101,7 +97,7 @@ def apply_feedback_sync(
     manager_comment: str,
     *,
     cv_text: str | None = None,
-    provider: str = "deepseek",
+    provider: str | None = None,
 ) -> BeraterprofilData:
     return revise_profile_with_feedback_sync(
         profile,

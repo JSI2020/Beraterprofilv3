@@ -21,15 +21,16 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    llm_provider: str = "deepseek"
+    llm_provider: str = "openai"
+    openai_api_key: str = ""
+    openai_model: str = "gpt-5.1"
+    openai_base_url: str = "https://api.openai.com/v1"
     deepseek_api_key: str = ""
     deepseek_model: str = "deepseek-chat"
     deepseek_base_url: str = "https://api.deepseek.com"
     mistral_api_key: str = ""
     mistral_model: str = "mistral-large-latest"
     mistral_base_url: str = "https://api.mistral.ai/v1"
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4o"
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-20250514"
 

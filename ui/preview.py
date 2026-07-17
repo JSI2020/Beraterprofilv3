@@ -52,6 +52,7 @@ def render_stepper(active: str) -> None:
 
 def render_llm_badge(active: bool, provider: str | None = None) -> None:
     provider_names = {
+        "openai": "OpenAI",
         "deepseek": "DeepSeek",
         "mistral": "Mistral",
     }

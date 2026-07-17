@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
@@ -52,10 +53,20 @@ def init_session_state() -> None:
         "photo_temp_path": None,
         "profile_revision": 0,
         "_export_done": False,
+        "llm_provider_select": None,
+        "_pptx_profile_hash": "",
     }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
+
+    if st.session_state.llm_provider_select is None:
+        try:
+            from app.services.llm_providers import resolve_provider
+
+            st.session_state.llm_provider_select = resolve_provider()
+        except RuntimeError:
+            st.session_state.llm_provider_select = "openai"
 
 
 def clear_profile_state() -> None:
@@ -82,13 +93,33 @@ def _photo_path() -> Path | None:
 def _apply_profile_update(profile: BeraterprofilData, *, regenerate_pptx: bool = True) -> None:
     st.session_state.profile_json = profile_to_json(profile)
     st.session_state.profile_revision = int(st.session_state.get("profile_revision", 0)) + 1
+    st.session_state._pptx_profile_hash = ""
     if regenerate_pptx:
         output = export_pptx(profile, photo_path=_photo_path())
         st.session_state.pptx_path = str(output)
         st.session_state._export_done = True
+        st.session_state._pptx_profile_hash = _profile_hash(profile)
     else:
         st.session_state.pptx_path = ""
         st.session_state._export_done = False
+
+
+def _profile_hash(profile: BeraterprofilData) -> str:
+    return hashlib.sha256(profile_to_json(profile).encode("utf-8")).hexdigest()
+
+
+def _ensure_pptx_matches_preview(profile: BeraterprofilData) -> Path:
+    """Rebuild PPTX whenever preview JSON changed so download matches preview."""
+    current_hash = _profile_hash(profile)
+    cached_hash = st.session_state.get("_pptx_profile_hash", "")
+    cached_path = Path(st.session_state.pptx_path) if st.session_state.pptx_path else None
+    if cached_hash == current_hash and cached_path and cached_path.exists():
+        return cached_path
+    output = export_pptx(profile, photo_path=_photo_path())
+    st.session_state.pptx_path = str(output)
+    st.session_state._pptx_profile_hash = current_hash
+    st.session_state._export_done = True
+    return output
 
 
 def render_main_workflow(opts: dict, status: dict) -> None:
@@ -182,6 +213,7 @@ def render_main_workflow(opts: dict, status: dict) -> None:
                 st.session_state.profile_json = profile_to_json(profile)
                 st.session_state.pptx_path = str(out_path)
                 st.session_state.profile_revision = 0
+                st.session_state._pptx_profile_hash = _profile_hash(profile)
             st.success("Profil erstellt - bitte pruefen und exportieren.")
         except Exception as exc:
             st.error(f"Profil-Generierung fehlgeschlagen: {exc}")
@@ -284,14 +316,6 @@ def _render_results(opts: dict, status: dict) -> None:
 
     _render_manager_feedback(opts, status)
 
-    try:
-        profile = _load_profile()
-    except json.JSONDecodeError as exc:
-        st.error(f"JSON ungueltig: {exc}")
-        return
-
-    render_preview(profile)
-
     rev = int(st.session_state.get("profile_revision", 0))
     with st.expander("JSON bearbeiten", expanded=False):
         edited = st.text_area(
@@ -303,11 +327,15 @@ def _render_results(opts: dict, status: dict) -> None:
         )
         if edited != st.session_state.profile_json:
             st.session_state.profile_json = edited
-            try:
-                profile = profile_from_json(edited)
-            except json.JSONDecodeError as exc:
-                st.error(f"JSON ungueltig: {exc}")
-                return
+            st.session_state._pptx_profile_hash = ""
+
+    try:
+        profile = _load_profile()
+    except json.JSONDecodeError as exc:
+        st.error(f"JSON ungueltig: {exc}")
+        return
+
+    render_preview(profile)
 
     st.markdown(
         '<p style="color:#0F172A;font-weight:700;font-size:1rem;margin:1rem 0 0.5rem 0;">'
@@ -324,13 +352,19 @@ def _render_results(opts: dict, status: dict) -> None:
 
     if st.button("PowerPoint erstellen", type="primary", disabled=not can_export, key="export_pptx_btn"):
         profile = _load_profile()
-        output = export_pptx(profile, photo_path=_photo_path())
-        st.session_state.pptx_path = str(output)
-        st.session_state._export_done = True
+        output = _ensure_pptx_matches_preview(profile)
         st.success(f"Erstellt: {output.name}")
         st.rerun()
 
-    pptx_path = Path(st.session_state.pptx_path) if st.session_state.pptx_path else None
+    if can_export:
+        try:
+            profile = _load_profile()
+            pptx_path = _ensure_pptx_matches_preview(profile)
+        except json.JSONDecodeError:
+            pptx_path = None
+    else:
+        pptx_path = None
+
     if pptx_path and pptx_path.exists():
         st.download_button(
             "PowerPoint herunterladen",

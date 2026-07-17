@@ -38,15 +38,13 @@ def parse_beraterprofil_pptx(path: str | Path) -> BeraterprofilData:
 
     profile = BeraterprofilData(
         title_domain=domain,
-        position=_plain_text(shapes["position"]) or "Consultant",
+        position=_plain_text(shapes["position"]),
         schwerpunkte=_plain_text(shapes["schwerpunkte"]),
         summary=_plain_text(shapes["summary"]),
-        kompetenzen=kompetenzen or ["Kompetenz 1", "Kompetenz 2", "Kompetenz 3"],
-        relevante_erfahrungen=erfahrungen or [
-            RelevantExperience(label="Erfahrung", beschreibung="Aus importierter PPTX")
-        ],
-        ausbildung_karriere=ausbildung or ["Karriere aus importierter PPTX"],
-        abschluss_zertifikate=abschluss or ["Abschluss aus importierter PPTX"],
+        kompetenzen=kompetenzen,
+        relevante_erfahrungen=erfahrungen,
+        ausbildung_karriere=ausbildung,
+        abschluss_zertifikate=abschluss,
         tool_kenntnisse=tools,
     )
     return fit_profile(profile, preserve_sections=True)

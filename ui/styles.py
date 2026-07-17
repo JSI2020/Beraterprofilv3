@@ -13,12 +13,12 @@ DESIGN_CSS = """
     --orbit-muted: #64748B;
     --orbit-border: #DCE4EC;
     --orbit-input-bg: #FFFFFF;
-    --orbit-accent: #0891B2;
-    --orbit-accent-2: #06B6D4;
-    --orbit-accent-soft: #E0F7FA;
+    --orbit-accent: #06B6D4;
+    --orbit-accent-2: #22D3EE;
+    --orbit-accent-soft: #CFFAFE;
     --orbit-navy: #0F172A;
     --orbit-navy-2: #1E3A5F;
-    --orbit-glow: rgba(6, 182, 212, 0.35);
+    --orbit-glow: rgba(34, 211, 238, 0.42);
 }
 
 html, body, [class*="css"] {
@@ -339,7 +339,7 @@ html, body, [class*="css"] {
 .orbit-hero {
     position: relative;
     overflow: hidden;
-    background: linear-gradient(115deg, #0B1220 0%, #0F2942 32%, #0E5C6E 68%, #0891B2 100%);
+    background: linear-gradient(115deg, #0C4A6E 0%, #0E7490 30%, #0891B2 62%, #22D3EE 100%);
     background-size: 220% 220%;
     animation: orbitDrift 16s ease-in-out infinite;
     border-radius: 22px;
@@ -353,8 +353,8 @@ html, body, [class*="css"] {
     position: absolute;
     inset: 0;
     background:
-        radial-gradient(420px 220px at 88% -20%, rgba(255,255,255,0.16), transparent 60%),
-        radial-gradient(360px 200px at 8% 120%, rgba(6,182,212,0.25), transparent 60%);
+        radial-gradient(420px 220px at 88% -20%, rgba(255,255,255,0.22), transparent 60%),
+        radial-gradient(360px 200px at 8% 120%, rgba(34,211,238,0.32), transparent 60%);
     pointer-events: none;
 }
 .orbit-hero-eyebrow {
@@ -365,9 +365,9 @@ html, body, [class*="css"] {
     font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: #A5F3FC;
-    background: rgba(6, 182, 212, 0.15);
-    border: 1px solid rgba(165, 243, 252, 0.35);
+    color: #ECFEFF;
+    background: rgba(34, 211, 238, 0.18);
+    border: 1px solid rgba(165, 243, 252, 0.55);
     padding: 0.3rem 0.7rem;
     border-radius: 999px;
     margin-bottom: 0.85rem;
@@ -444,7 +444,7 @@ html, body, [class*="css"] {
     box-shadow: 0 0 0 3px var(--orbit-accent-soft);
 }
 .orbit-step.is-active .orbit-step-num {
-    background: linear-gradient(135deg, #0891B2, #06B6D4);
+    background: linear-gradient(135deg, #06B6D4, #22D3EE);
     color: #fff;
 }
 .orbit-step.is-done .orbit-step-num { background: #059669; color: #fff; }
@@ -508,7 +508,7 @@ html, body, [class*="css"] {
 .stButton > button[kind="primary"],
 .stButton > button[kind="primary"] p,
 .stButton > button[kind="primary"] span {
-    background: linear-gradient(135deg, #0891B2, #0EA5C4 45%, #06B6D4) !important;
+    background: linear-gradient(135deg, #06B6D4, #0EA5C4 45%, #22D3EE) !important;
     color: #FFFFFF !important;
     -webkit-text-fill-color: #FFFFFF !important;
     border: none !important;

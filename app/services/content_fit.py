@@ -95,6 +95,155 @@ def _looks_like_abschluss(text: str) -> bool:
     return _looks_like_degree(t) and not _looks_like_job_entry(t)
 
 
+def _derive_ausbildung_from_relevante(data: BeraterprofilData) -> list[str]:
+    lines: list[str] = []
+    for item in data.relevante_erfahrungen:
+        line = f"{item.label}: {item.beschreibung}".strip(": ").strip()
+        if line:
+            lines.append(line)
+        if len(lines) >= LIMITS["ausbildung_count"]:
+            break
+    return lines
+
+
+def _recover_ausbildung(
+    ausbildung: list[str],
+    abschluss: list[str],
+    data: BeraterprofilData,
+) -> list[str]:
+    if ausbildung:
+        return ausbildung
+
+    career_from_abschluss = [
+        x
+        for x in abschluss
+        if (_looks_like_career(x) or _looks_like_job_entry(x)) and not _looks_like_abschluss(x)
+    ]
+    if career_from_abschluss:
+        return _trim_list(career_from_abschluss, LIMITS["ausbildung_count"], LIMITS["ausbildung_item"])
+
+    derived = _derive_ausbildung_from_relevante(data)
+    if derived:
+        return _trim_list(derived, LIMITS["ausbildung_count"], LIMITS["ausbildung_item"])
+
+    return []
+
+
+def _recover_abschluss(abschluss: list[str], ausbildung: list[str]) -> list[str]:
+    if abschluss:
+        return abschluss
+
+    degree_from_ausbildung = [x for x in ausbildung if _looks_like_abschluss(x)]
+    if degree_from_ausbildung:
+        return _trim_list(degree_from_ausbildung, LIMITS["abschluss_count"], LIMITS["abschluss_item"])
+
+    return []
+
+
+def _non_empty_strings(items: list | None) -> list[str]:
+    return [str(x).strip() for x in (items or []) if str(x).strip()]
+
+
+def profile_validation_issues(data: dict) -> list[str]:
+    """Return missing/invalid fields that must come from the CV extraction."""
+    issues: list[str] = []
+    if not str(data.get("title_domain") or "").strip():
+        issues.append("title_domain")
+    if not str(data.get("position") or "").strip():
+        issues.append("position")
+    if not str(data.get("schwerpunkte") or "").strip():
+        issues.append("schwerpunkte")
+    if not str(data.get("summary") or "").strip():
+        issues.append("summary")
+    if len(_non_empty_strings(data.get("kompetenzen"))) < 3:
+        issues.append("kompetenzen (mindestens 3 aus dem CV)")
+
+    relevante = data.get("relevante_erfahrungen") or []
+    valid_relevante = 0
+    for item in relevante:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("label") or "").strip() and str(item.get("beschreibung") or "").strip():
+            valid_relevante += 1
+    if valid_relevante < 2:
+        issues.append("relevante_erfahrungen (mindestens 2 aus dem CV)")
+
+    ausbildung = _non_empty_strings(data.get("ausbildung_karriere"))
+    abschluss = _non_empty_strings(data.get("abschluss_zertifikate"))
+    if not ausbildung:
+        career_from_abschluss = [
+            x
+            for x in abschluss
+            if (_looks_like_career(x) or _looks_like_job_entry(x)) and not _looks_like_abschluss(x)
+        ]
+        ausbildung = career_from_abschluss
+    if not ausbildung:
+        for item in relevante[:2]:
+            if isinstance(item, dict):
+                label = str(item.get("label") or "").strip()
+                desc = str(item.get("beschreibung") or "").strip()
+                if label and desc:
+                    ausbildung.append(f"{label}: {desc}")
+    if not ausbildung:
+        issues.append("ausbildung_karriere (aus dem CV)")
+
+    if not abschluss:
+        issues.append("abschluss_zertifikate (aus dem CV)")
+
+    return issues
+
+
+def sanitize_profile_dict(data: dict) -> dict:
+    """Structural cleanup only — never inject generic placeholder content."""
+    tools = data.get("tool_kenntnisse")
+    if not isinstance(tools, dict):
+        data["tool_kenntnisse"] = {}
+
+    data["kompetenzen"] = _non_empty_strings(data.get("kompetenzen"))[: LIMITS["kompetenzen_count"]]
+    data["ausbildung_karriere"] = _non_empty_strings(data.get("ausbildung_karriere"))[
+        : LIMITS["ausbildung_count"]
+    ]
+    data["abschluss_zertifikate"] = _non_empty_strings(data.get("abschluss_zertifikate"))[
+        : LIMITS["abschluss_count"]
+    ]
+
+    relevante = []
+    for item in data.get("relevante_erfahrungen") or []:
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get("label") or "").strip()
+        desc = str(item.get("beschreibung") or "").strip()
+        if label and desc:
+            relevante.append({"label": label, "beschreibung": desc})
+    data["relevante_erfahrungen"] = relevante[: LIMITS["relevante_count"]]
+
+    if not data["ausbildung_karriere"]:
+        career_from_abschluss = [
+            x
+            for x in data["abschluss_zertifikate"]
+            if (_looks_like_career(x) or _looks_like_job_entry(x)) and not _looks_like_abschluss(x)
+        ]
+        if career_from_abschluss:
+            data["ausbildung_karriere"] = career_from_abschluss[: LIMITS["ausbildung_count"]]
+            data["abschluss_zertifikate"] = [
+                x for x in data["abschluss_zertifikate"] if x not in career_from_abschluss
+            ]
+
+    if not data["ausbildung_karriere"]:
+        derived: list[str] = []
+        for item in data["relevante_erfahrungen"][:2]:
+            line = f"{item['label']}: {item['beschreibung']}".strip(": ").strip()
+            if line:
+                derived.append(line)
+        data["ausbildung_karriere"] = derived[: LIMITS["ausbildung_count"]]
+
+    return data
+
+
+# Backwards-compatible alias used by imports
+fill_required_profile_dict = sanitize_profile_dict
+
+
 def _separate_sections(data: BeraterprofilData) -> BeraterprofilData:
     """
     Ausbildung/Karriere = career highlights (NOT degrees).
@@ -175,13 +324,36 @@ def fit_profile(data: BeraterprofilData, *, preserve_sections: bool = False) -> 
     schwerpunkte_parts = [p.strip() for p in data.schwerpunkte.split(",") if p.strip()][:3]
     schwerpunkte = _trunc(", ".join(schwerpunkte_parts), LIMITS["schwerpunkte"])
 
+    ausbildung = _recover_ausbildung(ausbildung, abschluss, data)
+    abschluss = _recover_abschluss(abschluss, ausbildung)
+
+    issues = profile_validation_issues(
+        {
+            "title_domain": data.title_domain,
+            "position": data.position,
+            "schwerpunkte": schwerpunkte,
+            "summary": data.summary,
+            "kompetenzen": kompetenzen,
+            "relevante_erfahrungen": [
+                {"label": item.label, "beschreibung": item.beschreibung} for item in relevante
+            ],
+            "ausbildung_karriere": ausbildung,
+            "abschluss_zertifikate": abschluss,
+        }
+    )
+    if issues:
+        raise ValueError(
+            "Profil unvollständig — folgende Inhalte fehlen im CV-Extract: "
+            + ", ".join(issues)
+        )
+
     return BeraterprofilData(
         title_domain=_trunc(data.title_domain, LIMITS["title_domain"]),
         position=_trunc(data.position, LIMITS["position"]),
         schwerpunkte=schwerpunkte,
         summary=_trunc(data.summary, LIMITS["summary"], end="."),
-        kompetenzen=kompetenzen,
-        relevante_erfahrungen=relevante,
+        kompetenzen=kompetenzen[: LIMITS["kompetenzen_count"]],
+        relevante_erfahrungen=relevante[: LIMITS["relevante_count"]],
         ausbildung_karriere=ausbildung,
         abschluss_zertifikate=abschluss,
         tool_kenntnisse=fitted_tools,

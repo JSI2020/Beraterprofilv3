@@ -37,7 +37,8 @@ def build_pptx(
     output_path: Path,
     photo_bytes: bytes | None = None,
 ) -> Path:
-    data = fit_profile(data)
+    # Profile in UI/JSON is already normalized — only apply length limits, do not re-split sections.
+    data = fit_profile(data, preserve_sections=True)
 
     prs = Presentation(str(template_path))
     slide = prs.slides[0]
@@ -93,11 +94,15 @@ def build_pptx(
         ("Drive Test und Post-Processing", data.tool_kenntnisse.drive_test_post_processing),
         ("Mapping", data.tool_kenntnisse.mapping),
     ]
-    set_categorized_lines(
-        shapes["tool_kenntnisse"].text_frame,
-        [(lbl, val if val else " ") for lbl, val in tool_items],
-        prototypes["tool_kenntnisse"],
-    )
+    tool_items = [(lbl, val) for lbl, val in tool_items if val and val.strip()]
+    if tool_items:
+        set_categorized_lines(
+            shapes["tool_kenntnisse"].text_frame,
+            tool_items,
+            prototypes["tool_kenntnisse"],
+        )
+    else:
+        clear_shape_text(shapes["tool_kenntnisse"])
 
     clear_shape_text(shapes["tools_dup"])
 
